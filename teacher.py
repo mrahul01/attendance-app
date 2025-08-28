@@ -35,7 +35,7 @@ st.title("📚 Teacher - Attendance QR Generator")
 # Unique session ID
 session_id = str(uuid.uuid4())[:8]
 
-# --- Get location using JS and return to Streamlit ---
+# --- Inject JS to get location and send it back via window.postMessage ---
 location_html = """
 <script>
 function sendLocation() {
@@ -44,8 +44,9 @@ function sendLocation() {
             (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                const streamlitMsg = {"isStreamlitMessage":true,"type":"streamlit:setComponentValue","value": lat + "," + lon};
-                window.parent.postMessage(streamlitMsg, "*");
+                const coords = lat + "," + lon;
+                // Send coords to Streamlit via window.postMessage
+                window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:setComponentValue", value: coords}, "*");
             },
             (err) => {
                 alert("Error getting location: " + err.message);
@@ -59,14 +60,21 @@ function sendLocation() {
 <button onclick="sendLocation()">📍 Get My Location</button>
 """
 
-coords = components.html(location_html, height=50)
+# This creates a hidden Streamlit component that can receive the message from JS
+coords = components.html(location_html, height=60)
+
+# coords will always be None here because components.html does not capture postMessage return value
+# So we need a workaround: use a text_input to receive coords manually or use a custom component
+
+# Workaround: ask user to paste coords manually (for demo)
+coords_input = st.text_input("Paste your location here as 'lat,lon' after clicking the button above")
 
 lat, lon = "", ""
-if coords:
+if coords_input:
     try:
-        lat, lon = coords.split(",")
+        lat, lon = coords_input.split(",")
     except:
-        pass
+        st.error("Invalid location format. Use 'lat,lon'")
 
 # --- Teacher Input ---
 col1, col2 = st.columns(2)
@@ -93,3 +101,5 @@ if st.button("Generate Attendance QR", type="primary"):
         st.write("Topic:", topic)
         st.write("Location:", lat, lon)
         st.write("Student Link:", student_url)
+
+
