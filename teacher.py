@@ -28,116 +28,68 @@ import io
 import urllib.parse
 import streamlit.components.v1 as components
 
-# --- App Configuration ---
-st.set_page_config(
-    page_title="Attendance QR Generator",
-    page_icon="👨‍�",
-    layout="centered"
-)
+st.set_page_config(page_title="Attendance QR Generator", page_icon="📍")
 
-# --- JavaScript to get location ---
-# This is a small HTML/JS component that asks for the user's location
-# and then sends it back to Streamlit via a button.
-components.html(
-    """
-    <button id="getLocationBtn" style="display: none;">Get Location</button>
-    <p id="lat-display" style="display: none;"></p>
-    <p id="lon-display" style="display: none;"></p>
-    <script>
-    const getLocationBtn = document.getElementById('getLocationBtn');
-    const latDisplay = document.getElementById('lat-display');
-    const lonDisplay = document.getElementById('lon-display');
-    
-    getLocationBtn.addEventListener('click', () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(showPosition, showError);
-        } else {
-            alert("Geolocation is not supported by this browser.");
-        }
-    });
+st.title("📚 Teacher - Attendance QR Generator")
 
-    function showPosition(position) {
-        latDisplay.innerText = position.coords.latitude;
-        lonDisplay.innerText = position.coords.longitude;
-        // Simulate a click on a hidden button in the Streamlit app to pass the data back
-        const latInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[type="text"][placeholder*="Latitude"]');
-        const lonInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[type="text"][placeholder*="Longitude"]');
-        
-        if (latInput && lonInput) {
-            // Setting the value and dispatching a change event
-            latInput.value = position.coords.latitude;
-            latInput.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            lonInput.value = position.coords.longitude;
-            lonInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-
-    function showError(error) {
-        switch(error.code) {
-            case error.PERMISSION_DENIED:
-                alert("User denied the request for Geolocation.");
-                break;
-            case error.POSITION_UNAVAILABLE:
-                alert("Location information is unavailable.");
-                break;
-            case error.TIMEOUT:
-                alert("The request to get user location timed out.");
-                break;
-            case error.UNKNOWN_ERROR:
-                alert("An unknown error occurred.");
-                break;
-        }
-    }
-
-    // Trigger the JS button click when a Streamlit button is clicked
-    const stButton = window.parent.document.querySelector('button[kind="secondary"][aria-label="Get My Location"]');
-    if (stButton) {
-        stButton.addEventListener('click', () => {
-            getLocationBtn.click();
-        });
-    }
-
-    </script>
-    """,
-    height=0,  # Hide the component itself
-    width=0
-)
-
-# --- Teacher Panel ---
-st.title(" Teacher - Attendance QR Generator")
-
-# Generate unique session
+# Unique session ID
 session_id = str(uuid.uuid4())[:8]
 
-st.info(" Click 'Get My Location' to use your current coordinates.")
+# --- Get location using JS and return to Streamlit ---
+location_html = """
+<script>
+function sendLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const streamlitMsg = {"isStreamlitMessage":true,"type":"streamlit:setComponentValue","value": lat + "," + lon};
+                window.parent.postMessage(streamlitMsg, "*");
+            },
+            (err) => {
+                alert("Error getting location: " + err.message);
+            }
+        );
+    } else {
+        alert("Geolocation is not supported by this browser.");
+    }
+}
+</script>
+<button onclick="sendLocation()">📍 Get My Location</button>
+"""
+
+coords = components.html(location_html, height=50)
+
+lat, lon = "", ""
+if coords:
+    try:
+        lat, lon = coords.split(",")
+    except:
+        pass
+
+# --- Teacher Input ---
 col1, col2 = st.columns(2)
 with col1:
     topic = st.text_input("Enter Topic / Subject Name")
 with col2:
-    st.button("Get My Location", help="Click to populate Lat/Lon fields with your current location.", type="secondary")
+    st.text(f"Lat: {lat}, Lon: {lon}")
 
-lat = st.text_input("Enter Classroom Latitude (copy from Google Maps)", key="lat_input")
-lon = st.text_input("Enter Classroom Longitude (copy from Google Maps)", key="lon_input")
-
+# --- Generate QR ---
 if st.button("Generate Attendance QR", type="primary"):
     if not topic or not lat or not lon:
-        st.warning(" Please enter all details")
+        st.warning("⚠️ Please enter all details (topic and location).")
     else:
-        # URL for student portal (Replace localhost with deployment URL if hosted)
         student_url = f"http://localhost:8502/?session_id={session_id}&topic={urllib.parse.quote(topic)}&lat={lat}&lon={lon}"
 
-        # Generate QR
         qr = qrcode.make(student_url)
         buf = io.BytesIO()
         qr.save(buf, format="PNG")
         qr_img = buf.getvalue()
 
-        # Show QR
         st.image(qr_img, caption="📲 Scan this QR for Attendance", use_column_width=True)
 
-        # Show session details
-        st.success(f"QR Generated for session `{session_id}`")
+        st.success(f"✅ Session `{session_id}` created")
         st.write("Topic:", topic)
         st.write("Location:", lat, lon)
         st.write("Student Link:", student_url)
