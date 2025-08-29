@@ -13,10 +13,10 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 params = st.query_params  
-session_id = params.get("session_id", [""])[0]
-topic = params.get("topic", [""])[0]
-teacher_lat = float(params.get("lat", ["0"])[0])
-teacher_lon = float(params.get("lon", ["0"])[0])
+session_id = params.get("session_id", [""])
+topic = params.get("topic", [""])
+teacher_lat = float(params.get("lat", ["0"]))
+teacher_lon = float(params.get("lon", ["0"]))
 
 if not session_id:
     st.error("⚠️ Invalid or missing QR code link")
