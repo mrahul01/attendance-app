@@ -32,7 +32,7 @@ if location:
     lat = location.get("latitude")
     lon = location.get("longitude")
     if lat is not None and lon is not None:
-        st.write(f"Your current location: {lat:.6f}, {lon:.6f}")
+        st.write(f"Your current location: {lat:.9f}, {lon:.9f}")
 
         student_name = st.text_input("Enter your Name")
 
