@@ -278,7 +278,8 @@ if location and location.get("latitude") is not None and location.get("longitude
                 st.warning("Please enter your name to mark attendance.")
             else:
                 st.write("---")
-                
+# ... (rest of the code)
+
                 # Use current date to create a filename
                 today_date = datetime.date.today().strftime("%Y-%m-%d")
                 
@@ -317,6 +318,8 @@ if location and location.get("latitude") is not None and location.get("longitude
                 st.info(f"Your attendance for topic '{topic}' has been saved to the CSV file.")
                 st.write("Your location has been logged.")
                 st.write(attendance_record)
+
+# ... (rest of the code)
 else:
     st.info("Waiting for location coordinates...")
 
