@@ -61,136 +61,132 @@
 # distance = haversine(lat, lon, teacher_lat, teacher_lon)
 # st.write(f"Distance: {distance:.2f} meters")
 
-
-
 import streamlit as st
-from streamlit_geolocation import streamlit_geolocation
-from math import radians, sin, cos, sqrt, atan2
+import datetime
 import pandas as pd
-from datetime import datetime
-from github import Github, InputGitTreeElement
+import urllib.parse
+import os
+from streamlit_geolocation import streamlit_geolocation
 
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371000  # Earth radius in meters
-    phi1 = radians(lat1)
-    phi2 = radians(lat2)
-    dphi = radians(lat2 - lat1)
-    dlambda = radians(lon2 - lon1)
-    a = sin(dphi/2)**2 + cos(phi1) * cos(phi2) * sin(dlambda/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return R * c
+# Constants
+ALLOWED_DISTANCE_METERS = 100 # Students must be within 100 meters of the classroom
 
-# Use Streamlit secrets for GitHub token
-github_token = st.secrets["github"]["token"]
-repo_name = "mrahul01/attendance-app"
+st.set_page_config(
+    page_title="Attendance Marker",
+    page_icon="👨‍🎓",
+    layout="centered"
+)
 
-# Initialize GitHub object with your token
-g = Github(github_token)
-repo = g.get_repo(repo_name)
+st.title("👨‍🎓 Student - Mark Attendance")
 
-# --- Existing code ---
-params = st.query_params
-session_id = params.get("session_id", [""])
-topic = params.get("topic", [""])
-teacher_lat = float(params.get("lat", ["0"]))
-teacher_lon = float(params.get("lon", ["0"]))
+# Get query parameters from the QR code URL
+query_params = st.experimental_get_query_params()
+session_id = query_params.get("session_id", [None])[0]
+topic = query_params.get("topic", [None])[0]
+lat_classroom = query_params.get("lat", [None])[0]
+lon_classroom = query_params.get("lon", [None])[0]
 
-if not session_id:
-    st.error("⚠️ Invalid or missing QR code link")
+# Decode topic if it's URL-encoded
+if topic:
+    topic = urllib.parse.unquote(topic)
+
+st.subheader("Attendance Details")
+st.write(f"**Session ID:** `{session_id}`")
+st.write(f"**Topic:** `{topic}`")
+
+# Check if all required parameters are available
+if not all([session_id, topic, lat_classroom, lon_classroom]):
+    st.error("Invalid QR code. Please scan a valid QR code from your teacher.")
     st.stop()
 
-st.title("👩‍🎓 Student Attendance Portal")
-st.success(f"📚 Topic: {topic}")
-st.write(f"🆔 Session: {session_id}")
+# Convert classroom coordinates to floats
+try:
+    lat_classroom_f = float(lat_classroom)
+    lon_classroom_f = float(lon_classroom)
+except ValueError:
+    st.error("Invalid QR code. Location data is corrupted.")
+    st.stop()
 
+# Get student's location
+st.info("Click 'Get My Location' and allow location access to mark your attendance.")
 location = streamlit_geolocation()
 
-if location:
-    lat = location.get("latitude")
-    lon = location.get("longitude")
-    if lat is not None and lon is not None:
-        st.write(f"Your current location: {lat:.9f}, {lon:.9f}")
-        student_name = st.text_input("Enter your Name")
-        
-        # Additional input for phone information
-        # Note: You need to decide how to get this info from the user or device.
-        # This is just an example placeholder.
-        phone_info = "iPhone 14" # Placeholder for phone info
+if location and location.get("latitude") is not None and location.get("longitude") is not None:
+    student_lat = location.get("latitude")
+    student_lon = location.get("longitude")
 
-        if st.button("Mark Attendance"):
-            if not student_name:
-                st.warning("⚠️ Please enter your name")
-            else:
-                distance = haversine(lat, lon, teacher_lat, teacher_lon)
-                if distance <= 55:
-                    
-                    # Create a new attendance record
-                    attendance_data = {
-                        "name": [student_name],
-                        "phone_info": [phone_info],
-                        "date": [datetime.now().strftime("%Y-%m-%d")],
-                        "time": [datetime.now().strftime("%H:%M:%S")],
-                        "latitude": [lat],
-                        "longitude": [lon]
-                    }
-                    
-                    # File path in the GitHub repository
-                    file_path = f"attendance/{topic.replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
+    st.success(f"Your Location: {student_lat:.6f}, {student_lon:.6f}")
 
-                    try:
-                        # Check if file exists in the repo
-                        contents = repo.get_contents(file_path, ref="main")
-                        
-                        # If file exists, read it, append new data, and update it.
-                        existing_data = pd.read_csv(contents.download_url, encoding='utf-8')
-                        new_data = pd.DataFrame(attendance_data)
-                        updated_df = pd.concat([existing_data, new_data], ignore_index=True)
-                        
-                        # Encode the updated content
-                        updated_content = updated_df.to_csv(index=False)
-                        
-                        # Check for duplicate entry before committing
-                        if student_name in existing_data['name'].values:
-                            st.error("❌ Attendance already marked!")
-                        else:
-                            # Update file in GitHub
-                            repo.update_file(
-                                path=file_path,
-                                message=f"Added attendance for {student_name} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                                content=updated_content,
-                                sha=contents.sha,
-                                branch="main"
-                            )
-                            st.success(f"✅ Attendance marked for {student_name} and saved to GitHub!")
-                            
-                    except Exception as e:
-                        # If file does not exist, create it.
-                        if "Not Found" in str(e):
-                            new_df = pd.DataFrame(attendance_data)
-                            
-                            # Encode the new content
-                            new_content = new_df.to_csv(index=False)
-                            
-                            # Create file in GitHub
-                            repo.create_file(
-                                path=file_path,
-                                message=f"Created attendance file for {topic} on {datetime.now().strftime('%Y-%m-%d')}",
-                                content=new_content,
-                                branch="main"
-                            )
-                            st.success(f"✅ Attendance marked for {student_name} and saved to GitHub!")
-                        else:
-                            st.error(f"❌ An error occurred: {e}")
+    # Calculate distance using Haversine formula
+    # This is a simplified calculation for demonstration
+    def haversine_distance(lat1, lon1, lat2, lon2):
+        R = 6371000 # Radius of Earth in meters
+        phi1 = lat1 * 3.14159 / 180
+        phi2 = lat2 * 3.14159 / 180
+        delta_phi = (lat2 - lat1) * 3.14159 / 180
+        delta_lambda = (lon2 - lon1) * 3.14159 / 180
 
-                else:
-                    st.error("❌ You are outside the 55-meter range of the classroom")
+        a = (delta_phi / 2)**2 + (delta_lambda / 2)**2 * ((phi1+phi2)/2)**2
+        c = 2 * (a)**0.5
+        d = R * c
+        return d
+
+    distance = haversine_distance(lat_classroom_f, lon_classroom_f, student_lat, student_lon)
+
+    # Check if student is within the allowed distance
+    if distance > ALLOWED_DISTANCE_METERS:
+        st.error(f"You are too far from the classroom. Your location is {distance:.2f} meters away.")
     else:
-        st.info("Waiting for location permission...")
+        st.success(f"You are within {distance:.2f} meters of the classroom.")
 
-st.info("Click the button above to allow location access.")
-# This part of the code is for debugging and can be removed in the final app.
-if location:
-    st.write(f"Teacher location: {teacher_lat}, {teacher_lon}")
-    st.write(f"Your location: {lat}, {lon}")
-    distance = haversine(lat, lon, teacher_lat, teacher_lon)
-    st.write(f"Distance: {distance:.2f} meters")
+        # Get student's name
+        student_name = st.text_input("Enter your full name")
+
+        # Mark attendance button
+        if st.button("Mark My Attendance"):
+            if not student_name:
+                st.warning("Please enter your name to mark attendance.")
+            else:
+                st.write("---")
+                
+                # Use current date to create a filename
+                today_date = datetime.date.today().strftime("%Y-%m-%d")
+                
+                # Create the attendance record
+                attendance_record = {
+                    "student_name": student_name,
+                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "latitude": student_lat,
+                    "longitude": student_lon,
+                    "distance_meters": round(distance, 2)
+                }
+
+                # Construct the filename and path
+                filename = f"{topic}_{today_date}.csv"
+                filepath = os.path.join(os.path.dirname(__file__), filename)
+
+                # Check if file exists to determine if we need to write headers
+                file_exists = os.path.exists(filepath)
+                
+                # Append to the file
+                with open(filepath, 'a' if file_exists else 'w') as f:
+                    if not file_exists:
+                        f.write("student_name,timestamp,latitude,longitude,distance_meters\n")
+                    
+                    record_line = ",".join([
+                        f'"{attendance_record["student_name"]}"',
+                        attendance_record["timestamp"],
+                        str(attendance_record["latitude"]),
+                        str(attendance_record["longitude"]),
+                        str(attendance_record["distance_meters"])
+                    ])
+                    f.write(record_line + "\n")
+                
+                st.success("🎉 Attendance marked successfully!")
+                st.balloons()
+                st.info(f"Your attendance for topic '{topic}' has been saved.")
+                st.write("Your location has been logged.")
+                st.write(attendance_record)
+
+else:
+    st.info("Waiting for location coordinates...")
