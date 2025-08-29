@@ -88,7 +88,7 @@ if st.button("Generate Attendance QR", type="primary"):
     if not topic or not lat or not lon:
         st.warning("⚠️ Please enter all details (topic and location).")
     else:
-        student_url = f"http://localhost:8502/?session_id={session_id}&topic={urllib.parse.quote(topic)}&lat={lat}&lon={lon}"
+        student_url = f"https://attendance-studentmarkup.streamlit.app/?session_id={session_id}&topic={urllib.parse.quote(topic)}&lat={lat}&lon={lon}"
 
         qr = qrcode.make(student_url)
         buf = io.BytesIO()
