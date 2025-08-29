@@ -54,5 +54,9 @@ if location:
                     st.error("❌ You are outside the 55 meter range of the classroom")
     else:
         st.info("Waiting for location permission...")
-else:
-    st.info("Click the button above to allow location access.")
+
+st.info("Click the button above to allow location access.")
+st.write(f"Teacher location: {teacher_lat}, {teacher_lon}")
+st.write(f"Your location: {lat}, {lon}")
+distance = haversine(lat, lon, teacher_lat, teacher_lon)
+st.write(f"Distance: {distance:.2f} meters")
