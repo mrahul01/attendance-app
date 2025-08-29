@@ -62,8 +62,13 @@ params = st.query_params
 
 session_id = params.get("session_id", [""])[0]
 topic = params.get("topic", [""])[0]
-teacher_lat = float(params.get("lat", ["0"])[0])
-teacher_lon = float(params.get("lon", ["0"])[0])
+def safe_float(val, default=0.0):
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+teacher_lat = safe_float(params.get("lat", ["0"])[0])
+teacher_lon = safe_float(params.get("lon", ["0"])[0])
 
 if not session_id:
     st.error("⚠️ Invalid or missing QR code link")
